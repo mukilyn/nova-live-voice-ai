@@ -144,10 +144,12 @@
       <div class="conversation-header">
         <div class="conv-title-wrap">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span>Conversation & Commands History</span>
+          <span>Speech & Commands History</span>
+          <span class="history-badge" id="historyCountBadge">0 saved</span>
         </div>
         <div class="conv-actions">
-          <button class="text-action-btn" id="clearChatBtn">Clear</button>
+          <button class="text-action-btn" id="exportHistoryBtn" title="Export conversation to text file">Export</button>
+          <button class="text-action-btn" id="clearChatBtn" title="Clear saved history">Clear</button>
         </div>
       </div>
       <div class="chat-messages-container" id="chatMessages">
@@ -241,8 +243,26 @@
       <span class="toast-icon" id="toastIcon">⚠️</span>
       <span class="toast-message" id="toastMessage">Model auto-fallback switched to gpt-oss-120b</span>
     </div>
+
+    <!-- Floating WebGL Strands Voice Widget (Right Down Corner) -->
+    <div class="floating-voice-widget" id="floatingVoiceWidget" title="Click to speak with NOVA">
+      <div class="floating-strands-sphere" id="floatingStrandsCtn"></div>
+      <div class="floating-aura-ring"></div>
+      <div class="floating-mic-indicator">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </div>
+      <div class="floating-speech-chip" id="floatingSpeechChip">
+        <span class="chip-dot"></span>
+        <span id="floatingChipText">Talk to NOVA</span>
+      </div>
+    </div>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

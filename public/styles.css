@@ -948,3 +948,152 @@ body {
     justify-content: center;
   }
 }
+
+/* --- History Badge --- */
+.history-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(0, 242, 254, 0.12);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  font-family: var(--font-mono);
+}
+
+/* --- Floating WebGL Strands Voice Widget (Bottom Right Circle) --- */
+.floating-voice-widget {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.12), rgba(6, 8, 14, 0.95));
+  border: 1.5px solid rgba(0, 242, 254, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 242, 254, 0.35);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.floating-voice-widget:hover {
+  transform: scale(1.08) translateY(-4px);
+  border-color: rgba(0, 242, 254, 0.75);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 242, 254, 0.6);
+}
+
+.floating-voice-widget.listening {
+  border-color: rgba(0, 245, 160, 0.8);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 245, 160, 0.65);
+  animation: float-pulse 1.8s infinite alternate ease-in-out;
+}
+
+.floating-voice-widget.speaking {
+  border-color: rgba(243, 85, 218, 0.8);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 45px rgba(243, 85, 218, 0.65);
+}
+
+.floating-strands-sphere {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.floating-aura-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  pointer-events: none;
+  animation: ring-rotate 12s linear infinite;
+}
+
+.floating-mic-indicator {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  color: #06080e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 242, 254, 0.5);
+  transition: all 0.25s ease;
+  z-index: 2;
+}
+
+.floating-voice-widget.listening .floating-mic-indicator {
+  background: linear-gradient(135deg, #ff3366, #ff6b6b);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255, 51, 102, 0.6);
+  transform: scale(1.15);
+}
+
+.floating-speech-chip {
+  position: absolute;
+  right: 110px;
+  white-space: nowrap;
+  background: rgba(11, 15, 25, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-voice-widget:hover .floating-speech-chip,
+.floating-voice-widget.listening .floating-speech-chip,
+.floating-voice-widget.speaking .floating-speech-chip,
+.floating-voice-widget.thinking .floating-speech-chip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 6px var(--accent-cyan);
+}
+
+.floating-voice-widget.listening .chip-dot {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px var(--accent-green);
+  animation: blink 0.6s infinite;
+}
+
+.floating-voice-widget.speaking .chip-dot {
+  background: var(--accent-magenta);
+  box-shadow: 0 0 8px var(--accent-magenta);
+}
+
+@keyframes float-pulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.06); }
+}
+
+@keyframes ring-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

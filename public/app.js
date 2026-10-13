@@ -1,4 +1,6 @@
 // NOVA Live Voice AI Assistant Client Logic
+import { createStrands } from './strands.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   // --- DOM Elements ---
   const canvas = document.getElementById('voiceOrbCanvas');
@@ -14,6 +16,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const textInput = document.getElementById('textInput');
   const chatMessages = document.getElementById('chatMessages');
   const clearChatBtn = document.getElementById('clearChatBtn');
+  const historyCountBadge = document.getElementById('historyCountBadge');
+  const exportHistoryBtn = document.getElementById('exportHistoryBtn');
+
+  // Floating Strands Circle Widget (Right Down Corner)
+  const floatingVoiceWidget = document.getElementById('floatingVoiceWidget');
+  const floatingStrandsCtn = document.getElementById('floatingStrandsCtn');
+  const floatingChipText = document.getElementById('floatingChipText');
   
   // Status & Actions
   const currentModelDisplay = document.getElementById('currentModelDisplay');
@@ -121,6 +130,19 @@ document.addEventListener('DOMContentLoaded', () => {
     currentState = state;
     orbGlow.className = 'orb-glow-backdrop ' + state;
 
+    if (floatingVoiceWidget) {
+      floatingVoiceWidget.className = 'floating-voice-widget ' + state;
+    }
+    if (floatingChipText) {
+      if (state === 'listening') floatingChipText.textContent = 'Listening...';
+      else if (state === 'speaking') floatingChipText.textContent = 'NOVA Speaking...';
+      else if (state === 'thinking') floatingChipText.textContent = 'Thinking...';
+      else floatingChipText.textContent = 'Talk to NOVA';
+    }
+    if (strandsInstance) {
+      strandsInstance.setState(state);
+    }
+
     switch (state) {
       case 'idle':
         stateText.textContent = isHandsFree ? 'Listening in background... (Say "Nova")' : 'Tap mic to speak';
@@ -145,6 +167,28 @@ document.addEventListener('DOMContentLoaded', () => {
         micBtn.classList.remove('recording');
         stopSpeechBtn.style.display = 'inline-flex';
         break;
+    }
+  }
+
+  // --- Initialize WebGL Strands on Floating Widget ---
+  let strandsInstance = null;
+  if (floatingStrandsCtn) {
+    try {
+      strandsInstance = createStrands(floatingStrandsCtn, {
+        colors: ['#00f2fe', '#7f00ff', '#4facfe', '#f355da'],
+        count: 5,
+        speed: 0.5,
+        amplitude: 1.1,
+        waviness: 1.8,
+        thickness: 0.65,
+        glow: 2.8,
+        glass: true,
+        refraction: 3.0,
+        dispersion: 3.85,
+        glassSize: 0.48
+      });
+    } catch (e) {
+      console.warn('Strands WebGL initialization:', e);
     }
   }
 
@@ -192,6 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     currentAudioLevel += (dynamicVolume - currentAudioLevel) * 0.2;
     visualizerAngle += currentState === 'thinking' ? 0.04 : 0.012;
+
+    // Send live audio level to Strands WebGL effect
+    if (strandsInstance) {
+      strandsInstance.setAudioLevel(currentAudioLevel);
+    }
 
     // 1. Draw Central Fluid Core
     const baseRadius = 65 + currentAudioLevel * 45;
@@ -609,8 +658,90 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchLaptopStats();
   setInterval(fetchLaptopStats, 30000);
 
+  // --- Persistent Speech History in LocalStorage ---
+  const STORAGE_KEY = 'nova_speech_history_v1';
+
+  function getStoredHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveHistoryItem(item) {
+    try {
+      const list = getStoredHistory();
+      list.push({
+        sender: item.sender,
+        text: item.text,
+        action: item.action || null,
+        model: item.model || null,
+        time: item.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: new Date().toLocaleDateString()
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      updateHistoryBadge();
+    } catch (e) {}
+  }
+
+  function updateHistoryBadge() {
+    if (historyCountBadge) {
+      const count = getStoredHistory().length;
+      historyCountBadge.textContent = `${count} saved`;
+    }
+  }
+
+  function loadSavedHistory() {
+    const list = getStoredHistory();
+    updateHistoryBadge();
+    if (!list || list.length === 0) return;
+
+    chatMessages.innerHTML = '';
+    list.forEach(item => {
+      appendMessage(item.sender, item.text, item.action, item.model, false, item.time);
+    });
+  }
+
+  function exportSpeechHistory() {
+    const list = getStoredHistory();
+    if (list.length === 0) {
+      showToast('No saved speech history to export.');
+      return;
+    }
+    let txt = `========================================================\n`;
+    txt += `  NOVA LIVE VOICE AI - SPEECH & COMMAND HISTORY LOG\n`;
+    txt += `  Generated: ${new Date().toLocaleString()}\n`;
+    txt += `========================================================\n\n`;
+
+    list.forEach((item, idx) => {
+      const sender = item.sender === 'user' ? 'YOU' : `NOVA (${item.model || 'AI'})`;
+      txt += `[${item.date} ${item.time}] ${sender}:\n`;
+      txt += `  "${item.text}"\n`;
+      if (item.action) {
+        txt += `  >> Executed Action: ${item.action.type} -> ${item.action.target || ''}\n`;
+      }
+      txt += `\n`;
+    });
+
+    const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nova_speech_history_${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Speech history exported successfully!');
+  }
+
   // --- Chat UI Messaging Helper ---
-  function appendMessage(sender, text, action = null, model = null) {
+  function appendMessage(sender, text, action = null, model = null, saveToHistory = true, timeStr = null) {
+    const time = timeStr || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (saveToHistory) {
+      saveHistoryItem({ sender, text, action, model, time });
+    }
+
     const bubble = document.createElement('div');
     bubble.className = `message-bubble ${sender === 'user' ? 'user-bubble' : 'nova-bubble'}`;
 
@@ -623,7 +754,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const senderLabel = document.createElement('div');
     senderLabel.className = 'msg-sender';
-    senderLabel.textContent = sender === 'user' ? 'You' : `NOVA (${model || 'AI'})`;
+    senderLabel.textContent = sender === 'user' ? `You • ${time}` : `NOVA (${model || 'AI'}) • ${time}`;
 
     const textEl = document.createElement('div');
     textEl.className = 'msg-text';
@@ -662,7 +793,27 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
+  // Load existing persistent history on startup
+  loadSavedHistory();
+
   // --- Event Listeners ---
+
+  // Floating Right-Down Strands Circle Widget Click Listener
+  if (floatingVoiceWidget) {
+    floatingVoiceWidget.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentState === 'listening') {
+        stopListening();
+      } else {
+        startListening();
+      }
+    });
+  }
+
+  // Export History Button
+  if (exportHistoryBtn) {
+    exportHistoryBtn.addEventListener('click', exportSpeechHistory);
+  }
 
   // Microphone Main Button
   micBtn.addEventListener('click', () => {
@@ -709,8 +860,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Clear Chat History
   clearChatBtn.addEventListener('click', () => {
     conversationHistory = [];
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
     chatMessages.innerHTML = '';
-    appendMessage('nova', 'History cleared. Ready for your next command!');
+    updateHistoryBadge();
+    appendMessage('nova', 'History cleared. Ready for your next command!', null, null, false);
   });
 
   // Settings Modal Controls
