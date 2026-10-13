@@ -60,7 +60,20 @@
           <div class="live-transcript-preview" id="liveTranscriptPreview">
             <!-- Dynamic Real-Time Transcription Text -->
           </div>
+          <!-- Live Audio Input Volume Meter -->
+          <div class="audio-volume-meter" id="audioVolumeMeter" style="display: none;">
+            <span class="meter-label">MIC INPUT</span>
+            <div class="meter-track">
+              <div class="meter-bar" id="meterBar"></div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Mic Permission Notice Banner -->
+      <div class="mic-permission-notice" id="micPermissionNotice" style="display: none;">
+        <span class="notice-icon">⚠️</span>
+        <span class="notice-text">Microphone access is blocked. Click the <b>🔒 Lock</b> icon next to <code>localhost:3000</code> in your browser address bar, set <b>Microphone</b> to <b>Allow</b>, and tap the mic!</span>
       </div>
 
       <!-- Live Action Banner (shows command execution confirmation) -->

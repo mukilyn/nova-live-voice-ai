@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const systemStatsBtn = document.getElementById('systemStatsBtn');
   const toastNotification = document.getElementById('toastNotification');
   const toastMessage = document.getElementById('toastMessage');
+  const audioVolumeMeter = document.getElementById('audioVolumeMeter');
+  const meterBar = document.getElementById('meterBar');
+  const micPermissionNotice = document.getElementById('micPermissionNotice');
 
   // Settings Modal Elements
   const openSettingsBtn = document.getElementById('openSettingsBtn');
@@ -242,6 +245,22 @@ document.addEventListener('DOMContentLoaded', () => {
       strandsInstance.setAudioLevel(currentAudioLevel);
     }
 
+    // Update Live Audio Input VU Meter
+    if (meterBar && audioVolumeMeter) {
+      if (currentState === 'listening') {
+        audioVolumeMeter.style.display = 'flex';
+        const pct = Math.min(100, Math.round(currentAudioLevel * 260));
+        meterBar.style.width = pct + '%';
+        if (pct > 22) {
+          meterBar.style.background = '#00f5a0'; // green when speaking
+        } else {
+          meterBar.style.background = '#00f2fe';
+        }
+      } else {
+        audioVolumeMeter.style.display = 'none';
+      }
+    }
+
     // 1. Draw Central Fluid Core
     const baseRadius = 65 + currentAudioLevel * 45;
     const grad = ctx.createRadialGradient(centerX, centerY, 5, centerX, centerY, baseRadius);
@@ -322,19 +341,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Audio Context & Microphone Setup ---
   async function initAudioAnalyser() {
-    if (audioContext) return;
+    if (audioContext && micStream && micStream.active) return true;
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      audioContext = new AudioCtx();
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = 64;
-      audioDataArray = new Uint8Array(analyser.frequencyBinCount);
-
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const source = audioContext.createMediaStreamSource(micStream);
-      source.connect(analyser);
+      if (!audioContext) {
+        audioContext = new AudioCtx();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 64;
+        audioDataArray = new Uint8Array(analyser.frequencyBinCount);
+      }
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+      if (!micStream || !micStream.active) {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        const source = audioContext.createMediaStreamSource(micStream);
+        source.connect(analyser);
+      }
+      if (micPermissionNotice) micPermissionNotice.style.display = 'none';
+      return true;
     } catch (e) {
-      console.warn('Microphone audio context init note:', e.message);
+      console.warn('Microphone stream error:', e.message);
+      if (micPermissionNotice) micPermissionNotice.style.display = 'flex';
+      showToast('⚠️ Microphone blocked! Click the lock 🔒 icon next to localhost:3000 to Allow.', 6000);
+      return false;
     }
   }
 
@@ -410,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      console.warn('Web Speech API not supported by browser. Falling back to Groq Whisper.');
+      console.warn('Web Speech API not supported by browser. Using Groq Whisper HD mode.');
       sttModeSelect.value = 'whisper';
       return;
     }
@@ -447,9 +483,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     recognition.onerror = (event) => {
-      console.warn('Recognition event error:', event.error);
+      console.warn('Web Speech recognition event error:', event.error);
       if (event.error === 'not-allowed') {
-        showToast('Microphone access denied. Please allow microphone in browser.', 5000);
+        if (micPermissionNotice) micPermissionNotice.style.display = 'flex';
+        showToast('⚠️ Microphone blocked! Click lock icon in browser to Allow.', 6000);
+        setState('idle');
+      } else if (event.error === 'network' || event.error === 'service-not-allowed') {
+        showToast('🌐 WebSpeech network timeout. Switching to Groq Whisper HD mode...', 4000);
+        sttModeSelect.value = 'whisper';
+        startWhisperRecording();
+      } else if (event.error === 'no-speech') {
+        if (currentState === 'listening') {
+          liveTranscriptPreview.textContent = 'Listening... Speak your command';
+        }
       }
     };
 
@@ -462,21 +508,43 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initSpeechRecognition();
 
-  // --- Groq Whisper Recording Mode ---
+  // --- Groq Whisper Recording Mode with Voice Activity Detection (VAD) ---
+  let vadInterval = null;
+  let vadSilenceTimer = null;
+  let vadMaxTimeout = null;
+
   async function startWhisperRecording() {
+    const hasMic = await initAudioAnalyser();
+    if (!hasMic) {
+      setState('idle');
+      return;
+    }
+
     try {
-      await initAudioAnalyser();
       audioChunks = [];
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm' });
+
+      let speechDetected = false;
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunks.push(e.data);
       };
 
       mediaRecorder.onstop = async () => {
+        clearTimeout(vadSilenceTimer);
+        clearTimeout(vadMaxTimeout);
+        if (vadInterval) clearInterval(vadInterval);
+        
         setState('thinking');
+        liveTranscriptPreview.textContent = 'Transcribing voice with Groq Whisper...';
+
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        if (audioBlob.size < 400) {
+          setState('idle');
+          liveTranscriptPreview.textContent = '';
+          return;
+        }
+
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.webm');
 
@@ -486,28 +554,56 @@ document.addEventListener('DOMContentLoaded', () => {
             body: formData
           });
           const data = await res.json();
-          if (data.text) {
-            handleUserSpeech(data.text);
+          if (data.text && data.text.trim()) {
+            handleUserSpeech(data.text.trim());
           } else {
             setState('idle');
-            showToast('No speech detected in audio.');
+            liveTranscriptPreview.textContent = '';
+            showToast('No speech detected. Try speaking closer to mic!');
           }
         } catch (err) {
           setState('idle');
+          liveTranscriptPreview.textContent = '';
           showToast('Groq Whisper error: ' + err.message);
         }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
       isRecording = true;
       setState('listening');
+      liveTranscriptPreview.textContent = '🎙️ Listening... (Speak now)';
       playBeep('start');
+
+      // Voice Activity Detection: automatically stops when you finish speaking!
+      vadInterval = setInterval(() => {
+        if (currentAudioLevel > 0.08) {
+          speechDetected = true;
+          clearTimeout(vadSilenceTimer);
+          liveTranscriptPreview.textContent = '🎙️ Hearing your voice...';
+          vadSilenceTimer = setTimeout(() => {
+            if (isRecording && speechDetected) {
+              stopWhisperRecording();
+            }
+          }, 1600);
+        }
+      }, 150);
+
+      // 14-second max recording limit
+      vadMaxTimeout = setTimeout(() => {
+        if (isRecording) stopWhisperRecording();
+      }, 14000);
+
     } catch (err) {
+      setState('idle');
       showToast('Could not start microphone: ' + err.message);
     }
   }
 
   function stopWhisperRecording() {
+    clearTimeout(vadSilenceTimer);
+    clearTimeout(vadMaxTimeout);
+    if (vadInterval) clearInterval(vadInterval);
+
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stop();
       isRecording = false;
@@ -515,31 +611,46 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Unified Start / Stop Listening ---
-  function startListening() {
+  async function startListening() {
     if (currentState === 'speaking') {
       stopSpeaking();
     }
-    initAudioAnalyser();
-    liveTranscriptPreview.textContent = '';
+    
+    // Explicitly initialize and verify microphone with user click
+    const hasMic = await initAudioAnalyser();
+    if (!hasMic) {
+      setState('idle');
+      return;
+    }
+
+    liveTranscriptPreview.textContent = 'Listening... Speak now!';
 
     const sttMode = sttModeSelect.value;
     if (sttMode === 'whisper') {
       startWhisperRecording();
     } else {
-      if (recognition && !isRecognitionRunning) {
+      if (recognition) {
         try {
+          if (isRecognitionRunning) {
+            recognition.stop();
+          }
           recognition.start();
           playBeep('start');
         } catch (e) {
-          console.warn('Recognition start caught:', e);
+          console.warn('Recognition start caught, falling back to Whisper:', e);
+          sttModeSelect.value = 'whisper';
+          startWhisperRecording();
         }
+      } else {
+        sttModeSelect.value = 'whisper';
+        startWhisperRecording();
       }
     }
   }
 
   function stopListening() {
     const sttMode = sttModeSelect.value;
-    if (sttMode === 'whisper') {
+    if (sttMode === 'whisper' || isRecording) {
       stopWhisperRecording();
     } else {
       if (recognition && isRecognitionRunning) {
@@ -914,11 +1025,4 @@ document.addEventListener('DOMContentLoaded', () => {
       settingsModal.style.display = 'none';
     }
   });
-
-  // Auto start hands-free if permitted
-  setTimeout(() => {
-    if (isHandsFree) {
-      startListening();
-    }
-  }, 1000);
 });
