@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NOVA - Live Voice AI Laptop Assistant</title>
+  <meta name="description" content="Live voice AI companion for your laptop with Groq multi-model fallback, Whisper STT, voice synthesis, and desktop OS automation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00f2fe">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Bar Navigation -->
+    <header class="top-nav">
+      <div class="brand">
+        <div class="brand-orb-icon"></div>
+        <div class="brand-text">
+          <span class="brand-name">NOVA</span>
+          <span class="brand-badge">LIVE AI</span>
+        </div>
+      </div>
+
+      <div class="model-status-pill" id="modelStatusPill">
+        <span class="status-dot online"></span>
+        <span class="model-name-label" id="currentModelDisplay">qwen/qwen3.8-27b</span>
+        <span class="model-fallback-badge" id="fallbackBadge" title="Automatic token failover active">AUTO-FALLBACK ON</span>
+      </div>
+
+      <div class="top-controls">
+        <button class="nav-btn" id="systemStatsBtn" title="Laptop System & Battery Stats">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+          <span id="laptopBatteryLabel">Battery</span>
+        </button>
+        <button class="nav-btn" id="openSettingsBtn" title="Voice & Model Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Live Voice Stage -->
+    <main class="main-stage">
+      <div class="orb-container">
+        <!-- Canvas for Dynamic Audio-Reactive Particle Sphere -->
+        <canvas id="voiceOrbCanvas" width="380" height="380"></canvas>
+
+        <!-- Ambient Glow Aura behind Orb -->
+        <div class="orb-glow-backdrop" id="orbGlow"></div>
+
+        <!-- Central Voice Status Indicator -->
+        <div class="orb-state-indicator">
+          <div class="state-chip" id="stateChip">
+            <span class="state-pulse"></span>
+            <span id="stateText">Tap to speak or say "Nova"</span>
+          </div>
+          <div class="live-transcript-preview" id="liveTranscriptPreview">
+            <!-- Dynamic Real-Time Transcription Text -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Action Banner (shows command execution confirmation) -->
+      <div class="action-alert-banner" id="actionAlertBanner" style="display: none;">
+        <div class="action-icon">⚡</div>
+        <div class="action-info">
+          <div class="action-title" id="actionAlertTitle">Command Executed</div>
+          <div class="action-desc" id="actionAlertDesc">Opening YouTube in your browser...</div>
+        </div>
+      </div>
+
+      <!-- Quick Command Bar -->
+      <div class="quick-commands-bar">
+        <span class="quick-label">Try speaking:</span>
+        <button class="cmd-pill" data-command="Open YouTube on browser">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          Open YouTube
+        </button>
+        <button class="cmd-pill" data-command="Search Google for latest tech news">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Search Google
+        </button>
+        <button class="cmd-pill" data-command="Open Calculator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M8 18h.01M12 18h.01"/></svg>
+          Calculator
+        </button>
+        <button class="cmd-pill" data-command="Open Notepad">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Notepad
+        </button>
+        <button class="cmd-pill" data-command="Check laptop battery and specs">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="16" height="10" rx="2" ry="2"/><line x1="22" y1="11" x2="22" y2="13"/></svg>
+          Laptop Stats
+        </button>
+        <button class="cmd-pill" data-command="Mute laptop audio">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          Mute Audio
+        </button>
+      </div>
+
+      <!-- Primary Interactive Voice Dock -->
+      <div class="voice-dock">
+        <!-- Push-to-talk / Hold Mic Button -->
+        <button class="primary-mic-btn" id="micBtn" title="Click to speak">
+          <div class="mic-wave-ring ring-1"></div>
+          <div class="mic-wave-ring ring-2"></div>
+          <div class="mic-inner-icon">
+            <svg id="micIcon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </div>
+        </button>
+
+        <!-- Continuous Conversation Mode Toggle -->
+        <div class="mode-toggles">
+          <button class="toggle-mode-btn active" id="handsFreeBtn" title="Toggle Always-Listening Continuous Mode">
+            <span class="toggle-dot"></span>
+            <span>Hands-Free Live</span>
+          </button>
+          <button class="toggle-mode-btn" id="stopSpeechBtn" title="Stop NOVA speaking immediately" style="display: none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            <span>Stop Speaking</span>
+          </button>
+        </div>
+
+        <!-- Text Input Alternative -->
+        <form class="text-input-form" id="chatForm">
+          <input type="text" id="textInput" placeholder="Speak, or type a command like 'open youtube'..." autocomplete="off">
+          <button type="submit" class="send-btn" id="sendBtn" title="Send message">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
+      </div>
+    </main>
+
+    <!-- Side / Bottom Conversation Drawer -->
+    <section class="conversation-panel" id="conversationPanel">
+      <div class="conversation-header">
+        <div class="conv-title-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>Conversation & Commands History</span>
+        </div>
+        <div class="conv-actions">
+          <button class="text-action-btn" id="clearChatBtn">Clear</button>
+        </div>
+      </div>
+      <div class="chat-messages-container" id="chatMessages">
+        <div class="message-bubble nova-bubble welcome-bubble">
+          <div class="msg-avatar">N</div>
+          <div class="msg-body">
+            <div class="msg-sender">NOVA Assistant</div>
+            <div class="msg-text">Hello! I am your live voice companion. You can speak to me naturally or give laptop commands like <b>"Open YouTube on browser"</b>, <b>"Open calculator"</b>, or <b>"Check battery"</b>. My Groq models are configured with automatic failover so I never run out of tokens. Tap the microphone or say something to begin!</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Voice & Groq Model Settings</h3>
+          <button class="close-modal-btn" id="closeSettingsBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Model Cascade Manager -->
+          <div class="setting-group">
+            <label class="setting-label">Active Groq Model</label>
+            <select id="modelSelect" class="form-select">
+              <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b (Primary - Fast & Smart)</option>
+              <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (High Capacity 120B)</option>
+              <option value="openai/gpt-oss-20b">openai/gpt-oss-20b (Ultra Fast 20B)</option>
+              <option value="allam-2-7b">allam-2-7b</option>
+            </select>
+            <p class="setting-hint">If token limit or rate limit (HTTP 429) occurs, NOVA automatically rotates down the fallback cascade without stopping.</p>
+          </div>
+
+          <!-- Model Failover Sequence -->
+          <div class="setting-group">
+            <label class="setting-label">Auto-Fallback Cascade Chain</label>
+            <div class="cascade-flow">
+              <span class="cascade-node active">qwen/3.8-27b</span>
+              <span class="cascade-arrow">➔</span>
+              <span class="cascade-node">gpt-oss-120b</span>
+              <span class="cascade-arrow">➔</span>
+              <span class="cascade-node">gpt-oss-20b</span>
+              <span class="cascade-arrow">➔</span>
+              <span class="cascade-node">allam-2-7b</span>
+            </div>
+          </div>
+
+          <!-- Speech-to-Text Mode -->
+          <div class="setting-group">
+            <label class="setting-label">Speech Recognition (STT) Engine</label>
+            <select id="sttModeSelect" class="form-select">
+              <option value="webspeech">Browser Web Speech API (Real-Time Live Streaming)</option>
+              <option value="whisper">Groq Whisper Large v3 Turbo (HD Studio Recording)</option>
+            </select>
+          </div>
+
+          <!-- Voice Synthesizer Voice Picker -->
+          <div class="setting-group">
+            <label class="setting-label">Text-to-Speech (TTS) Voice</label>
+            <select id="ttsVoiceSelect" class="form-select">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+
+          <!-- Speech Rate & Pitch -->
+          <div class="setting-row">
+            <div class="setting-half">
+              <label class="setting-label">Speech Speed (<span id="speedVal">1.0</span>x)</label>
+              <input type="range" id="speechSpeed" min="0.7" max="1.5" step="0.1" value="1.0" class="range-slider">
+            </div>
+            <div class="setting-half">
+              <label class="setting-label">Pitch (<span id="pitchVal">1.0</span>)</label>
+              <input type="range" id="speechPitch" min="0.7" max="1.4" step="0.1" value="1.0" class="range-slider">
+            </div>
+          </div>
+
+          <!-- Groq API Key Input -->
+          <div class="setting-group">
+            <label class="setting-label">Groq API Key</label>
+            <input type="password" id="apiKeyInput" class="form-input" placeholder="Configure in .env or enter Groq API Key here">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="saveAndCloseBtn">Save & Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast-notification" id="toastNotification" style="display: none;">
+      <span class="toast-icon" id="toastIcon">⚠️</span>
+      <span class="toast-message" id="toastMessage">Model auto-fallback switched to gpt-oss-120b</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

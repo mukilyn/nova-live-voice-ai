@@ -1,0 +1,17 @@
+{
+  "name": "NOVA Live Voice AI",
+  "short_name": "NOVA AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06080e",
+  "theme_color": "#00f2fe",
+  "description": "Live voice conversational AI assistant for your laptop.",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
